@@ -26,6 +26,7 @@ Automated tracking of all Clankers PR contributors.
 | Homie4570 | 5 | 2026-05-13 |
 | masuda-so | 5 | 2026-05-13 |
 | rinopatrick | 4 | 2026-05-13 |
+| boopy253 | 4 | 2026-05-14 |
 | tjmyou123 | 3 | 2026-05-13 |
 | kingzzoov-ctrl | 3 | 2026-05-13 |
 | Mermaid-Man | 3 | 2026-05-13 |
@@ -34,7 +35,6 @@ Automated tracking of all Clankers PR contributors.
 | kenproxx | 3 | 2026-05-13 |
 | juangenovardortiz | 3 | 2026-05-13 |
 | BerqiaMouad | 3 | 2026-05-13 |
-| boopy253 | 3 | 2026-05-14 |
 | tuvmdainam | 2 | 2026-05-13 |
 | davguij | 2 | 2026-05-13 |
 | SebnemC | 2 | 2026-05-13 |
