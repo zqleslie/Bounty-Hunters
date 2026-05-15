@@ -438,6 +438,12 @@
     "last_pr": "2026-05-15T12:11:40.182Z"
   },
   {
+    "username": "Xiaoqiang-Huang",
+    "total_prs": 2,
+    "first_pr": "2026-05-15T17:11:10.002Z",
+    "last_pr": "2026-05-15T17:22:20.194Z"
+  },
+  {
     "username": "ErenCankutUYSAL",
     "total_prs": 1,
     "first_pr": "2026-05-13T19:25:27Z",
@@ -670,11 +676,5 @@
     "total_prs": 1,
     "first_pr": "2026-05-15T14:33:07.792Z",
     "last_pr": "2026-05-15T14:33:07.792Z"
-  },
-  {
-    "username": "Xiaoqiang-Huang",
-    "total_prs": 1,
-    "first_pr": "2026-05-15T17:11:10.002Z",
-    "last_pr": "2026-05-15T17:11:10.002Z"
   }
 ]
