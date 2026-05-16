@@ -33,6 +33,18 @@ import {
   browserApiCorsAllowedMethods,
   browserApiCorsHeaders,
 } from "./httpCors.ts";
+import {
+  compressResponseBody,
+  DEFAULT_COMPRESSION_CONFIG,
+} from "./httpCompression.ts";
+import * as Metric from "effect/Metric";
+import * as Clock from "effect/Clock";
+import {
+  compressionRequestsTotal,
+  compressionSavingsBytes,
+  compressionLatency,
+  metricAttributes,
+} from "./observability/Metrics.ts";
 
 const PROJECT_FAVICON_CACHE_CONTROL = "public, max-age=3600";
 const FALLBACK_PROJECT_FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#6b728080" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-fallback="project-favicon"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2Z"/></svg>`;
@@ -115,13 +127,12 @@ export const otlpTracesProxyRouteLayer = HttpRouter.add(
       return HttpServerResponse.empty({ status: 204 });
     }
 
-    return yield* httpClient
+    const response = yield* httpClient
       .post(otlpTracesUrl, {
         body: HttpBody.jsonUnsafe(bodyJson),
       })
       .pipe(
         Effect.flatMap(HttpClientResponse.filterStatusOk),
-        Effect.as(HttpServerResponse.empty({ status: 204 })),
         Effect.tapError((cause) =>
           Effect.logWarning("Failed to export browser OTLP traces", {
             cause,
@@ -132,6 +143,36 @@ export const otlpTracesProxyRouteLayer = HttpRouter.add(
           Effect.succeed(HttpServerResponse.text("Trace export failed.", { status: 502 })),
         ),
       );
+
+    // --- Compression support for proxy response ---
+    if (response.status === 204 || response.status === 200) {
+      const acceptEncoding = request.headers["accept-encoding"];
+      if (acceptEncoding) {
+        const responseData = yield* Effect.promise(() => response.body.asUint8Array());
+        const { data: compressedData, encoding } = await compressResponseBody(
+          responseData,
+          acceptEncoding,
+          "application/json",
+          DEFAULT_COMPRESSION_CONFIG,
+        );
+        if (encoding) {
+          return HttpServerResponse.uint8Array(compressedData, {
+            status: response.status,
+            contentType: "application/json",
+            headers: {
+              "Content-Encoding": encoding,
+              "Vary": "Accept-Encoding",
+            },
+          });
+        }
+        return HttpServerResponse.uint8Array(responseData, {
+          status: response.status,
+          contentType: "application/json",
+        });
+      }
+    }
+
+    return HttpServerResponse.empty({ status: 204 });
   }).pipe(Effect.catchTag("AuthError", respondToAuthError)),
 );
 
@@ -302,9 +343,31 @@ export const staticAndDevRouteLayer = HttpRouter.add(
       if (!indexData) {
         return HttpServerResponse.text("Not Found", { status: 404 });
       }
+
+      const indexContentType = "text/html; charset=utf-8";
+      const acceptEncoding = request.headers["accept-encoding"];
+      if (acceptEncoding) {
+        const { data: compressedData, encoding } = await compressResponseBody(
+          indexData,
+          acceptEncoding,
+          indexContentType,
+          DEFAULT_COMPRESSION_CONFIG,
+        );
+        if (encoding) {
+          return HttpServerResponse.uint8Array(compressedData, {
+            status: 200,
+            contentType: indexContentType,
+            headers: {
+              "Content-Encoding": encoding,
+              "Vary": "Accept-Encoding",
+            },
+          });
+        }
+      }
+
       return HttpServerResponse.uint8Array(indexData, {
         status: 200,
-        contentType: "text/html; charset=utf-8",
+        contentType: indexContentType,
       });
     }
 
@@ -314,6 +377,47 @@ export const staticAndDevRouteLayer = HttpRouter.add(
       .pipe(Effect.catch(() => Effect.succeed(null)));
     if (!data) {
       return HttpServerResponse.text("Internal Server Error", { status: 500 });
+    }
+
+    // --- Compression support ---
+    const acceptEncoding = request.headers["accept-encoding"];
+    if (acceptEncoding) {
+      const startedAt = yield* Clock.currentTimeNanos;
+      const { data: compressedData, encoding } = await compressResponseBody(
+        data,
+        acceptEncoding,
+        contentType,
+        DEFAULT_COMPRESSION_CONFIG,
+      );
+      const endedAt = yield* Clock.currentTimeNanos;
+      const latencyNanos = Number(endedAt - startedAt);
+
+      if (encoding) {
+        yield* Metric.update(
+          Metric.withAttributes(compressionRequestsTotal, metricAttributes({
+            encoding,
+            contentType: contentType ?? "unknown",
+          })),
+          1,
+        );
+        yield* Metric.update(
+          Metric.withAttributes(compressionSavingsBytes, metricAttributes({ encoding })),
+          data.length - compressedData.length,
+        );
+        yield* Metric.update(
+          Metric.withAttributes(compressionLatency, metricAttributes({ encoding })),
+          BigInt(latencyNanos),
+        );
+
+        return HttpServerResponse.uint8Array(compressedData, {
+          status: 200,
+          contentType,
+          headers: {
+            "Content-Encoding": encoding,
+            "Vary": "Accept-Encoding",
+          },
+        });
+      }
     }
 
     return HttpServerResponse.uint8Array(data, {
