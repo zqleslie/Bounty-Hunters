@@ -19,6 +19,17 @@ import type { OrchestrationDispatchError } from "../Errors.ts";
 import type { OrchestrationEventStoreError } from "../../persistence/Errors.ts";
 
 /**
+ * Interrupted command snapshot — partial state saved when a command's
+ * Effect fiber is interrupted mid-execution (e.g. client disconnect).
+ */
+export interface InterruptedCommandSnapshot {
+  readonly commandId: string;
+  readonly aggregateKind: "project" | "thread";
+  readonly aggregateId: string;
+  readonly partialSequence: number;
+}
+
+/**
  * OrchestrationEngineShape - Service API for orchestration command and event flow.
  */
 export interface OrchestrationEngineShape {
@@ -51,6 +62,28 @@ export interface OrchestrationEngineShape {
    * This is a hot runtime stream (new events only), not a historical replay.
    */
   readonly streamDomainEvents: Stream.Stream<OrchestrationEvent>;
+
+  /**
+   * Query all interrupted commands that have been checkpointed.
+   *
+   * Reconnecting clients call this to discover commands that were interrupted
+   * mid-execution (e.g. due to client disconnect) and can resume from the
+   * last checkpointed partial state.
+   *
+   * @returns Array of interrupted command snapshots.
+   */
+  readonly getInterruptedCommands: () => Effect.Effect<
+    ReadonlyArray<InterruptedCommandSnapshot>
+  >;
+
+  /**
+   * Clear an interrupted command after it has been resumed or discarded.
+   *
+   * @param commandId - The command ID to clear from the checkpoint map.
+   */
+  readonly clearInterruptedCommand: (
+    commandId: string,
+  ) => Effect.Effect<boolean>;
 }
 
 /**
