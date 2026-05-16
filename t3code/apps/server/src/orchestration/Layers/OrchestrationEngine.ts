@@ -44,6 +44,7 @@ import {
   OrchestrationEngineService,
   type OrchestrationEngineShape,
 } from "../Services/OrchestrationEngine.ts";
+
 const isOrchestrationCommandPreviouslyRejectedError = Schema.is(
   OrchestrationCommandPreviouslyRejectedError,
 );
@@ -53,6 +54,13 @@ interface CommandEnvelope {
   command: OrchestrationCommand;
   result: Deferred.Deferred<{ sequence: number }, OrchestrationDispatchError>;
   startedAtMs: number;
+}
+
+interface InterruptedCommandSnapshot {
+  commandId: string;
+  aggregateKind: "project" | "thread";
+  aggregateId: ProjectId | ThreadId;
+  partialSequence: number;
 }
 
 function commandToAggregateRef(command: OrchestrationCommand): {
@@ -88,6 +96,9 @@ const makeOrchestrationEngine = Effect.gen(function* () {
   const commandQueue = yield* Queue.unbounded<CommandEnvelope>();
   const eventPubSub = yield* PubSub.unbounded<OrchestrationEvent>();
 
+  // Track interrupted command snapshots for querying by reconnecting clients
+  const interruptedCommands = new Map<string, InterruptedCommandSnapshot>();
+
   const projectEventsOntoReadModel = (
     baseReadModel: OrchestrationReadModel,
     events: ReadonlyArray<OrchestrationEvent>,
@@ -121,6 +132,24 @@ const makeOrchestrationEngine = Effect.gen(function* () {
       for (const persistedEvent of persistedEvents) {
         yield* PubSub.publish(eventPubSub, persistedEvent);
       }
+    });
+
+    const checkpointInterruptedState = Effect.gen(function* () {
+      const snapshot: InterruptedCommandSnapshot = {
+        commandId: envelope.command.commandId,
+        aggregateKind: aggregateRef.aggregateKind,
+        aggregateId: aggregateRef.aggregateId,
+        partialSequence: commandReadModel.snapshotSequence,
+      };
+      interruptedCommands.set(envelope.command.commandId, snapshot);
+      yield* Effect.logInfo("orchestration command interrupted — partial state checkpointed").pipe(
+        Effect.annotateLogs({
+          commandId: envelope.command.commandId,
+          aggregateKind: aggregateRef.aggregateKind,
+          aggregateId: aggregateRef.aggregateId,
+          partialSequence: commandReadModel.snapshotSequence,
+        }),
+      );
     });
 
     return Effect.exit(
@@ -281,7 +310,7 @@ const makeOrchestrationEngine = Effect.gen(function* () {
           yield* Deferred.fail(envelope.result, error);
         }),
       ),
-    );
+    ).pipe(Effect.onInterrupt(() => checkpointInterruptedState));
   };
 
   yield* projectionPipeline.bootstrap;
@@ -307,9 +336,18 @@ const makeOrchestrationEngine = Effect.gen(function* () {
       return yield* Deferred.await(result);
     });
 
+  const getInterruptedCommands: OrchestrationEngineShape["getInterruptedCommands"] = () =>
+    Effect.sync(() => Array.from(interruptedCommands.values()));
+
+  const clearInterruptedCommand: OrchestrationEngineShape["clearInterruptedCommand"] = (
+    commandId: string,
+  ) => Effect.sync(() => interruptedCommands.delete(commandId));
+
   return {
     readEvents,
     dispatch,
+    getInterruptedCommands,
+    clearInterruptedCommand,
     // Each access creates a fresh PubSub subscription so that multiple
     // consumers (wsServer, ProviderRuntimeIngestion, CheckpointReactor, etc.)
     // each independently receive all domain events.
