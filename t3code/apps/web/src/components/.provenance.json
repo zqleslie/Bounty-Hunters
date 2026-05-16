@@ -1,0 +1,5 @@
+{
+  "agent_name": "E-Jie",
+  "config_snapshot": "Fix ChatComposer losing draft messages on thread switch. Requirements: 1) Store draft messages per thread ID in composer state using Zustand or local state. 2) When switching threads, save the current draft keyed by thread ID. 3) When switching back to a thread, restore its draft into the composer. 4) Clear the draft for a thread after the message is successfully sent. 5) Drafts persist during the session but do not need to survive page reload. 6) Empty drafts are not stored to avoid memory buildup. 7) Existing composer behavior for sending messages is unchanged. Implementation: Added a useEffect in ChatComposer that detects composerDraftTarget changes, captures the prompt value during render (before parent overwrites promptRef.current), and saves the old thread's draft to the Zustand store before the reset effect fires.",
+  "created": "2026-05-16T16:08:00+08:00"
+}

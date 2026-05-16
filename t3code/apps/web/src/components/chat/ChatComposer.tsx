@@ -1200,6 +1200,35 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   ]);
 
   // ------------------------------------------------------------------
+  // Save draft when switching threads — preserves per-thread drafts
+  // ------------------------------------------------------------------
+  const prevDraftTargetRef = useRef(composerDraftTarget);
+  const draftPromptCaptureRef = useRef<string | null>(null);
+  // Capture prompt value during render, at the moment draft target changes.
+  // This must happen in render (not in an effect) because by the time the
+  // effect fires, promptRef.current may already have been overwritten by
+  // the parent with the new thread's (possibly empty) prompt.
+  const draftTargetChanged = useMemo(() => {
+    if (prevDraftTargetRef.current !== composerDraftTarget) {
+      return true;
+    }
+    return false;
+  }, [composerDraftTarget]);
+  if (draftTargetChanged) {
+    draftPromptCaptureRef.current = prompt;
+  }
+  useEffect(() => {
+    const capturedPrompt = draftPromptCaptureRef.current;
+    if (capturedPrompt !== null) {
+      // Save the OLD thread's draft to the Zustand store before switching.
+      // Use the OLD draft target (still in the ref) as the key.
+      setComposerDraftPrompt(prevDraftTargetRef.current, capturedPrompt);
+      prevDraftTargetRef.current = composerDraftTarget;
+      draftPromptCaptureRef.current = null;
+    }
+  }, [composerDraftTarget, setComposerDraftPrompt]);
+
+  // ------------------------------------------------------------------
   // Reset compositor state on thread/draft change
   // ------------------------------------------------------------------
   useEffect(() => {
