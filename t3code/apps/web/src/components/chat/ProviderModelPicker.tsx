@@ -3,7 +3,7 @@ import {
   type ProviderDriverKind,
   type ResolvedKeybindingsConfig,
 } from "@t3tools/contracts";
-import { memo, useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState, useCallback } from "react";
 import type { VariantProps } from "class-variance-authority";
 import { ChevronDownIcon } from "lucide-react";
 import { Button, buttonVariants } from "../ui/button";
@@ -19,6 +19,9 @@ import {
 } from "./providerIconUtils";
 import { setModelPickerOpen } from "../../modelPickerOpenState";
 import type { ProviderInstanceEntry } from "../../providerInstances";
+
+const LS_PROVIDER_KEY = "t3code:provider-model-picker:provider";
+const LS_MODEL_KEY = "t3code:provider-model-picker:model";
 
 export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
   /**
@@ -49,11 +52,58 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
   // Resolve the active instance entry by exact routing key. The composer
   // resolves fallbacks before rendering this component; if the selected
   // instance disappears, do not infer a replacement from its driver kind.
+  // Load persisted selection from localStorage on mount
+  const [persistedSelection, setPersistedSelection] = useState<{ providerId: ProviderInstanceId; model: string } | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const savedProvider = localStorage.getItem(LS_PROVIDER_KEY);
+      const savedModel = localStorage.getItem(LS_MODEL_KEY);
+      if (savedProvider && savedModel) {
+        return { providerId: savedProvider as ProviderInstanceId, model: savedModel };
+      }
+    } catch { /* ignore localStorage errors */ }
+    return null;
+  });
+
+  // Listen for changes from other tabs
+  useEffect(() => {
+    const handler = (e: StorageEvent) => {
+      if (e.key === LS_PROVIDER_KEY || e.key === LS_MODEL_KEY) {
+        try {
+          const savedProvider = localStorage.getItem(LS_PROVIDER_KEY);
+          const savedModel = localStorage.getItem(LS_MODEL_KEY);
+          if (savedProvider && savedModel) {
+            setPersistedSelection({ providerId: savedProvider as ProviderInstanceId, model: savedModel });
+          }
+        } catch { /* ignore */ }
+      }
+    };
+    window.addEventListener("storage", handler);
+    return () => window.removeEventListener("storage", handler);
+  }, []);
+
   const activeEntry = useMemo(() => {
     return (
       props.instanceEntries.find((entry) => entry.instanceId === props.activeInstanceId) ?? null
     );
   }, [props.activeInstanceId, props.instanceEntries]);
+
+  // Persist selection when provider/model changes
+  const persistSelection = useCallback((instanceId: ProviderInstanceId, model: string) => {
+    try {
+      localStorage.setItem(LS_PROVIDER_KEY, instanceId);
+      localStorage.setItem(LS_MODEL_KEY, model);
+      setPersistedSelection({ providerId: instanceId, model });
+    } catch { /* ignore localStorage errors */ }
+  }, []);
+
+  const resetPersistedSelection = useCallback(() => {
+    try {
+      localStorage.removeItem(LS_PROVIDER_KEY);
+      localStorage.removeItem(LS_MODEL_KEY);
+      setPersistedSelection(null);
+    } catch { /* ignore */ }
+  }, []);
 
   const activeInstanceId = props.activeInstanceId;
   const selectedInstanceOptions = props.modelOptionsByInstance.get(activeInstanceId) ?? [];
@@ -88,6 +138,7 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
 
   const handleInstanceModelChange = (instanceId: ProviderInstanceId, model: string) => {
     if (props.disabled) return;
+    persistSelection(instanceId, model);
     props.onInstanceModelChange(instanceId, model);
     setIsMenuOpen(false);
   };
@@ -180,6 +231,8 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
           terminalOpen={props.terminalOpen ?? false}
           onRequestClose={() => setIsMenuOpen(false)}
           onInstanceModelChange={handleInstanceModelChange}
+          persistedSelection={persistedSelection}
+          onResetSelection={resetPersistedSelection}
         />
       </PopoverPopup>
     </Popover>
