@@ -13,6 +13,62 @@ import * as Electron from "electron";
 import { DesktopEnvironment, type DesktopEnvironmentShape } from "../app/DesktopEnvironment.ts";
 
 export const DESKTOP_SCHEME = "t3";
+export const DEEPLINK_SCHEME = "t3code";
+
+export type DeepLinkRoute =
+  | { type: "open"; path: string }
+  | { type: "chat"; threadId: string }
+  | { type: "settings" }
+  | { type: "unknown"; rawUrl: string };
+
+/**
+ * Parse a t3code:// deep link URL into a typed route.
+ *
+ * Supported patterns:
+ * - t3code://open/project?path=/path/to/repo
+ * - t3code://chat/thread?id=abc123
+ * - t3code://settings
+ *
+ * Returns { type: "unknown", rawUrl } for unrecognised patterns.
+ */
+export function parseDeepLinkUrl(rawUrl: string): DeepLinkRoute {
+  try {
+    const url = new URL(rawUrl);
+    const host = url.hostname.toLowerCase();
+
+    if (host === "open") {
+      const projectPath = url.searchParams.get("path");
+      if (!projectPath) {
+        return { type: "unknown", rawUrl };
+      }
+      // Reject path traversal
+      if (
+        projectPath.includes("..") ||
+        projectPath.startsWith("~") ||
+        /[<>"|%]/.test(projectPath)
+      ) {
+        return { type: "unknown", rawUrl };
+      }
+      return { type: "open", path: projectPath };
+    }
+
+    if (host === "chat") {
+      const threadId = url.searchParams.get("id");
+      if (!threadId) {
+        return { type: "unknown", rawUrl };
+      }
+      return { type: "chat", threadId };
+    }
+
+    if (host === "settings") {
+      return { type: "settings" };
+    }
+
+    return { type: "unknown", rawUrl };
+  } catch {
+    return { type: "unknown", rawUrl };
+  }
+}
 
 export class ElectronProtocolRegistrationError extends Data.TaggedError(
   "ElectronProtocolRegistrationError",
@@ -49,6 +105,14 @@ export interface ElectronProtocolShape {
     ElectronProtocolRegistrationError | ElectronProtocolStaticBundleMissingError,
     FileSystem.FileSystem | DesktopEnvironment | Scope.Scope
   >;
+  readonly registerDeepLinkProtocol: Effect.Effect<
+    void,
+    ElectronProtocolRegistrationError,
+    Scope.Scope
+  >;
+  readonly handleDeepLinkUrl: (
+    url: string,
+  ) => Effect.Effect<DeepLinkRoute, ElectronProtocolRegistrationError>;
 }
 
 export class ElectronProtocol extends Context.Service<ElectronProtocol, ElectronProtocolShape>()(
@@ -263,9 +327,45 @@ const make = Effect.gen(function* () {
     });
   }).pipe(Effect.withSpan("desktop.electron.protocol.registerDesktopFileProtocol"));
 
+  const registerDeepLinkProtocol = Effect.fn("desktop.electron.protocol.registerDeepLinkProtocol")(
+    function* (): Effect.fn.Return<void, ElectronProtocolRegistrationError, Scope.Scope> {
+      yield* Effect.acquireRelease(
+        Effect.try({
+          try: () => {
+            Electron.app.setAsDefaultProtocolClient(DEEPLINK_SCHEME);
+          },
+          catch: (cause) =>
+            new ElectronProtocolRegistrationError({ scheme: DEEPLINK_SCHEME, cause }),
+        }),
+        () =>
+          Effect.sync(() => {
+            Electron.app.removeAsDefaultProtocolClient(DEEPLINK_SCHEME);
+          }),
+      );
+    },
+  );
+
+  const handleDeepLinkUrl = Effect.fn("desktop.electron.protocol.handleDeepLinkUrl")(
+    function* (
+      url: string,
+    ): Effect.fn.Return<DeepLinkRoute, ElectronProtocolRegistrationError> {
+      yield* Effect.annotateCurrentSpan({ url });
+      const route = parseDeepLinkUrl(url);
+      if (route.type === "unknown") {
+        return yield* new ElectronProtocolRegistrationError({
+          scheme: DEEPLINK_SCHEME,
+          cause: `Unrecognised deep link pattern: ${url}`,
+        });
+      }
+      return route;
+    },
+  );
+
   return ElectronProtocol.of({
     registerFileProtocol,
     registerDesktopFileProtocol,
+    registerDeepLinkProtocol,
+    handleDeepLinkUrl,
   });
 });
 

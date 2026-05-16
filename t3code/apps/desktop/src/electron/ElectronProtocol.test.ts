@@ -5,18 +5,29 @@ import * as Option from "effect/Option";
 import type * as Electron from "electron";
 import { beforeEach, vi } from "vitest";
 
-const { registerFileProtocolMock, registerSchemesAsPrivilegedMock, unregisterProtocolMock } =
-  vi.hoisted(() => ({
-    registerFileProtocolMock: vi.fn(),
-    registerSchemesAsPrivilegedMock: vi.fn(),
-    unregisterProtocolMock: vi.fn(),
-  }));
+const {
+  registerFileProtocolMock,
+  registerSchemesAsPrivilegedMock,
+  unregisterProtocolMock,
+  setAsDefaultProtocolClientMock,
+  removeAsDefaultProtocolClientMock,
+} = vi.hoisted(() => ({
+  registerFileProtocolMock: vi.fn(),
+  registerSchemesAsPrivilegedMock: vi.fn(),
+  unregisterProtocolMock: vi.fn(),
+  setAsDefaultProtocolClientMock: vi.fn(),
+  removeAsDefaultProtocolClientMock: vi.fn(),
+}));
 
 vi.mock("electron", () => ({
   protocol: {
     registerFileProtocol: registerFileProtocolMock,
     registerSchemesAsPrivileged: registerSchemesAsPrivilegedMock,
     unregisterProtocol: unregisterProtocolMock,
+  },
+  app: {
+    setAsDefaultProtocolClient: setAsDefaultProtocolClientMock,
+    removeAsDefaultProtocolClient: removeAsDefaultProtocolClientMock,
   },
 }));
 
@@ -27,6 +38,8 @@ describe("ElectronProtocol", () => {
     registerFileProtocolMock.mockReset();
     registerSchemesAsPrivilegedMock.mockReset();
     unregisterProtocolMock.mockReset();
+    setAsDefaultProtocolClientMock.mockReset();
+    removeAsDefaultProtocolClientMock.mockReset();
   });
 
   it("normalizes safe desktop protocol pathnames", () => {
@@ -102,4 +115,73 @@ describe("ElectronProtocol", () => {
       assert.deepEqual(unregisterProtocolMock.mock.calls, [["t3"]]);
     }).pipe(Effect.provide(ElectronProtocol.layer)),
   );
+});
+
+describe("DeepLink parsing", () => {
+  it("parses open/project deep links", () => {
+    const route = ElectronProtocol.parseDeepLinkUrl(
+      "t3code://open/project?path=/path/to/repo",
+    );
+    assert.deepEqual(route, { type: "open", path: "/path/to/repo" });
+  });
+
+  it("parses chat/thread deep links", () => {
+    const route = ElectronProtocol.parseDeepLinkUrl(
+      "t3code://chat/thread?id=abc123",
+    );
+    assert.deepEqual(route, { type: "chat", threadId: "abc123" });
+  });
+
+  it("parses settings deep links", () => {
+    const route = ElectronProtocol.parseDeepLinkUrl("t3code://settings");
+    assert.deepEqual(route, { type: "settings" });
+  });
+
+  it("rejects path traversal in open links", () => {
+    const route = ElectronProtocol.parseDeepLinkUrl(
+      "t3code://open/project?path=/path/to/../secret",
+    );
+    assert.equal(route.type, "unknown");
+  });
+
+  it("rejects tilde paths in open links", () => {
+    const route = ElectronProtocol.parseDeepLinkUrl(
+      "t3code://open/project?path=~/secret",
+    );
+    assert.equal(route.type, "unknown");
+  });
+
+  it("rejects URLs with special characters", () => {
+    const route = ElectronProtocol.parseDeepLinkUrl(
+      't3code://open/project?path=/path/to/<script>',
+    );
+    assert.equal(route.type, "unknown");
+  });
+
+  it("returns unknown for missing path parameter", () => {
+    const route = ElectronProtocol.parseDeepLinkUrl("t3code://open/project");
+    assert.equal(route.type, "unknown");
+  });
+
+  it("returns unknown for missing thread id", () => {
+    const route = ElectronProtocol.parseDeepLinkUrl("t3code://chat/thread");
+    assert.equal(route.type, "unknown");
+  });
+
+  it("returns unknown for unrecognised host", () => {
+    const route = ElectronProtocol.parseDeepLinkUrl("t3code://unknown/action");
+    assert.equal(route.type, "unknown");
+  });
+
+  it("returns unknown for malformed URLs", () => {
+    const route = ElectronProtocol.parseDeepLinkUrl("not-a-url");
+    assert.equal(route.type, "unknown");
+  });
+
+  it("handles case-insensitive hosts", () => {
+    const route = ElectronProtocol.parseDeepLinkUrl(
+      "t3code://OPEN/project?path=/path/to/repo",
+    );
+    assert.deepEqual(route, { type: "open", path: "/path/to/repo" });
+  });
 });
