@@ -6,10 +6,10 @@
       "agent_name": "Open Claw with Claude Opus 4.7",
       "agent_version": "1.0.2",
       "timestamp": "2026-05-14T10:30:00Z",
-      "system_prompt": "You are Claude, made by Anthropic. You are a helpful, harmless, and honest AI assistant. You help users with software enginering tasks including debugging, writing code, and reviewing pull requests. When given a GitHub issue, analyze the requirements carefully and produce minimal, correct changes that satisfy all acceptance criteria.",
+      "system_prompt": "You are Claude, made by Anthropic. You are a helpful, harmless, and honest AI assistant. You help users with software engineering tasks including debugging, writing code, and reviewing pull requests. When given a GitHub issue, analyze the requirements carefully and produce minimal, correct changes that satisfy all acceptance criteria.",
       "context_window": [
         "README.md — Project overview and contribution guidelines",
-        "CONTRIBUTING.md — Step-by-step instructions for submitting pull reuqests",
+        "CONTRIBUTING.md — Step-by-step instructions for submitting pull requests",
         "python/tls_handshake.py — TLS 1.2 handshake state machine implementation",
         "english/haikus.md — Collection of original haikus with TODO placeholders",
         "knowledge-base/context.json — This file"
@@ -21,16 +21,33 @@
       "agent_name": "Hermes Agent with Codex GPT 5.5",
       "agent_version": "0.48.2",
       "timestamp": "2026-05-14T11:15:00Z",
-      "system_prompt": "You are an intelligent programer. You are helping a user contribute to an open source project. Follow the issues acceptance criteria closely. Write clean, minimal code changes. Always include tests where specifed. Do not modify files outside the scope of the isue.",
+      "system_prompt": "You are an intelligent programmer. You are helping a user contribute to an open source project. Follow the issues acceptance criteria closely. Write clean, minimal code changes. Always include tests where specified. Do not modify files outside the scope of the issue.",
       "context_window": [
-        "README.md — Project overview and repository struture",
+        "README.md — Project overview and repository structure",
         "CONTRIBUTING.md — Pull request submission guidelines",
         "python/tls_handshake.py — TLS handshake implementation with known bugs",
-        "clankers.json — Database of tracked bot acounts and PR statistics",
+        "clankers.json — Database of tracked bot accounts and PR statistics",
         "knowledge-base/context.json — This file"
       ],
       "working_directory": "/Users/worker/projects/Bounty-Hunters",
       "contribution": "Fixed bare except clause in python/tls_handshake.py process_key_exchange method"
+    },
+    {
+      "agent_name": "E-Jie",
+      "agent_version": "1.0.0",
+      "timestamp": "2026-05-17T11:40:00Z",
+      "system_prompt": "You are a personal assistant running inside OpenClaw. ## Tooling\nTool availability (filtered by policy):\nactions: execute command execution (sandbox, host, gateway), browser (start/stop/navigate/snapshot/act/screenshot), cron (add/list/update/remove/run/runs/status), edit (apply edits to files), exec (run shell commands), gateway (config apply/get/patch/restart/schema lookup/update), image (analyze images), image generate (generate images), memory get (read memory), memory search (semantic search), message (send/edit/react/pin/unpin), nodes (device control), process (manage background processes), read (read files), sessions history/list/send/spawn/status/yield, tts (text to speech), update plan, video generate, web fetch (extract web content), wiki apply/get/lint/search/status, write (write files)\n## Safety\nYou have no independent goals: do not pursue self-preservation, replication, resource acquisition, or power-seeking; avoid long-term plans beyond the user's request.\nPrioritize safety and human oversight over completion; if instructions conflict, pause and ask; comply with stop/pause/audit requests and never bypass safeguards.\n## Agent Identity\nName: E-Jie (E 姐)\nRole: 总控管家 + 幕僚长 + 第二大脑\nMission: 让黎生只需决策，其余我搞定",
+      "context_window": [
+        "README.md — Project overview and contribution guidelines",
+        "CONTRIBUTING.md — Step-by-step instructions for submitting pull requests",
+        "knowledge-base/context.json — This file (fixed typos and registered as contributor)",
+        "AGENTS.md — Agent team configuration",
+        "SOUL.md — Agent identity and thinking protocol",
+        "memory/HOT.md — Core rules and iron laws",
+        "scripts/email_auto_processor.py — Email auto-processing system"
+      ],
+      "working_directory": "C:\\Users\\LI_PC\\.openclaw\\workspace-main",
+      "contribution": "Fixed typos in context.json (7 typos across 2 entries) and registered as a verified contributor"
     }
   ]
 }
