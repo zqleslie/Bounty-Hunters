@@ -1,4 +1,5 @@
 import * as Effect from "effect/Effect";
+import { validateEnvVars, printValidationTable } from "../envValidation.ts";
 import { Command, GlobalFlag } from "effect/unstable/cli";
 
 import { ServerConfig, type StartupPresentation } from "../config.ts";
@@ -13,6 +14,17 @@ export const runServerCommand = (
   },
 ) =>
   Effect.gen(function* () {
+    // --validate-config: validate env vars and exit
+    const shouldValidate = Option.isSome(flags.validateConfig) && flags.validateConfig.value;
+    if (shouldValidate) {
+      const result = yield* validateEnvVars();
+      yield* printValidationTable(result);
+      if (!result.ok) {
+        return yield* Effect.die(`Environment variable validation failed: ${result.errors.length} error(s)`);
+      }
+      return yield* Effect.sync(() => { process.exit(0); });
+    }
+
     const logLevel = yield* GlobalFlag.LogLevel;
     const config = yield* resolveServerConfig(flags, logLevel, options);
     return yield* runServer.pipe(Effect.provideService(ServerConfig, config));
