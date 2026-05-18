@@ -250,6 +250,19 @@ def get_redoc_html(
             """
         ),
     ] = True,
+    google_fonts_url: Annotated[
+        str,
+        Doc(
+            """
+            The URL to use to load the Google Fonts stylesheet.
+
+            It is normally set to a Google Fonts URL.
+
+            Read more about it in the
+            [FastAPI docs for Custom Docs UI Static Assets](https://fastapi.tiangolo.com/how-to/custom-docs-ui-assets/)
+            """
+        ),
+    ] = "https://fonts.googleapis.com/css?family=Montserrat:300,400,700|Roboto:300,400,700",
 ) -> HTMLResponse:
     """
     Generate and return the HTML response that loads ReDoc for the alternative
@@ -271,8 +284,8 @@ def get_redoc_html(
     <meta name="viewport" content="width=device-width, initial-scale=1">
     """
     if with_google_fonts:
-        html += """
-    <link href="https://fonts.googleapis.com/css?family=Montserrat:300,400,700|Roboto:300,400,700" rel="stylesheet">
+        html += f"""
+    <link href="{google_fonts_url}" rel="stylesheet">
     """
     html += f"""
     <link rel="shortcut icon" href="{redoc_favicon_url}">
