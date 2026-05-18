@@ -1,0 +1,5 @@
+{
+  "tool": "E-Jie (OpenClaw Agent)",
+  "platform_config": "OpenClaw agent E-Jie running with Thinking Claude v5.1 protocol. Role: 鎬绘帶绠″ + 骞曞儦闀?+ 绗簩澶ц剳. Workspace: C:\\Users\\LI_PC\\.openclaw\\workspace-main. Rules: 杩芥眰鏁堢巼鎷掔粷瀹㈠, 鐩存帴缁欏彲鎵ц鏂规, 鑷垜淇, 楂橀闄╂搷浣滀簩娆＄‘璁? 涓嶆硠闇查殣绉? 涓嶄唬鏇垮喅绛? 涓ョ铻嶈祫浜ゆ槗, 鍗曞竵绉嶄粨浣嶁墹30%, 涓诲姏妯″瀷鐢ㄩ樋閲岀櫨鐐? 澶栭儴浜や簰闅愮淇濇姢. Development: coding-agent浼樺厛, Claude Code --print --permission-mode bypassPermissions. Git: origin=zqleslie/openclaw-workspace, token auth. Team: E濮?涓?/O浠?鍐呭)/P鍝?A鑲?/C濡?鏁版嵁閲囬泦)/N鍝?鎶曡祫鍒嗘瀽).",
+  "date": "2026-05-18T15:30:00+08:00"
+}
