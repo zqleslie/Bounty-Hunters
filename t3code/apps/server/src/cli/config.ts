@@ -79,11 +79,11 @@ export const tailscaleServePortFlag = Flag.integer("tailscale-serve-port").pipe(
   Flag.withSchema(PortSchema),
   Flag.withDescription("HTTPS port for Tailscale Serve when --tailscale-serve is enabled."),
   Flag.optional,
+);
 
 export const validateConfigFlag = Flag.boolean("validate-config").pipe(
   Flag.withDescription("Validate environment variables and exit without starting the server."),
   Flag.optional,
-);
 );
 
 const EnvServerConfig = Config.all({
