@@ -1,0 +1,13 @@
+{
+  "agent": "E-Jie",
+  "issue": 853,
+  "title": "[ T3 Code ] Add environment variable validation at server startup",
+  "timestamp": "2026-05-18T11:30:00+08:00",
+  "files_changed": [
+    "t3code/apps/server/src/envValidation.ts",
+    "t3code/apps/server/src/envValidation.test.ts",
+    "t3code/apps/server/src/cli/config.ts",
+    "t3code/apps/server/src/cli/server.ts",
+    "t3code/_provenance.json"
+  ]
+}

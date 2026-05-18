@@ -397,6 +397,7 @@ export const resolveCliAuthConfig = (
       logWebSocketEvents: Option.none(),
       tailscaleServeEnabled: Option.none(),
       tailscaleServePort: Option.none(),
+      validateConfig: Option.none(),
     },
     cliLogLevel,
   );
