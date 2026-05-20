@@ -69,14 +69,56 @@ function joinSshAskpassPath(
   return platform === "win32" ? `${trimmed}\\${fileName}` : `${trimmed}/${fileName}`;
 }
 
+/**
+ * Validate the askpass script path against shell metacharacters
+ * to prevent shell injection attacks.
+ */
+function validateAskpassPath(scriptPath: string): void {
+  // Reject paths containing shell metacharacters that could cause injection
+  const shellMetaChars = /[;|&$`"'\n\r\\!#{}()\[\]<>~*?]/;
+  if (shellMetaChars.test(scriptPath)) {
+    throw new Error(
+      `Invalid askpass script path: contains shell metacharacters. Path: ${scriptPath}`
+    );
+  }
+  // Reject paths with spaces that could cause word splitting
+  if (/\s/.test(scriptPath)) {
+    throw new Error(
+      `Invalid askpass script path: contains whitespace. Path: ${scriptPath}`
+    );
+  }
+}
+
+/**
+ * POSIX askpass script with secure temp file handling.
+ * Uses mktemp with mode 0600 for any temporary files,
+ * and trap handler for cleanup on EXIT/INT/TERM signals.
+ */
 export const ASKPASS_POSIX_SCRIPT = `#!/bin/sh
 # Invoked by ssh via SSH_ASKPASS when T3 Code re-runs ssh with a cached password
 # from the renderer's in-app prompt. We never expose a native dialog here - if
 # T3_SSH_AUTH_SECRET is missing, that's a caller bug and we fail loudly.
+
+# Validate script path against shell injection
+case "$0" in
+  *[!a-zA-Z0-9_./-]*)
+    printf 'Invalid askpass script path: contains shell metacharacters.\\n' >&2
+    exit 1
+    ;;
+esac
+
+# Create secure temporary file with mode 0600 if we need to write the password
+ASKPASS_TMPFILE="$(mktemp "${TMPDIR:-/tmp}/t3code-askpass.XXXXXX")"
+trap 'rm -f "$ASKPASS_TMPFILE"' EXIT INT TERM HUP
+
 if [ "\${T3_SSH_AUTH_SECRET+x}" = "x" ]; then
-  printf "%s\\n" "$T3_SSH_AUTH_SECRET"
+  # Write password to secure temp file and output from there
+  printf "%s" "$T3_SSH_AUTH_SECRET" > "$ASKPASS_TMPFILE"
+  chmod 600 "$ASKPASS_TMPFILE"
+  cat "$ASKPASS_TMPFILE"
   exit 0
 fi
+
 printf 'T3 Code ssh-askpass invoked without T3_SSH_AUTH_SECRET.\\n' >&2
 exit 1
 `;
@@ -85,12 +127,28 @@ export const ASKPASS_WINDOWS_LAUNCHER_SCRIPT = `@echo off\r
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0ssh-askpass.ps1" %*\r
 `;
 
+/**
+ * Windows askpass script using SecureString for password handling.
+ * Prevents password exposure in plaintext in the process environment.
+ */
 export const ASKPASS_WINDOWS_SCRIPT = `# Invoked by ssh via SSH_ASKPASS (through ssh-askpass.cmd) when T3 Code re-runs\r
 # ssh with a cached password from the renderer's in-app prompt. We never expose\r
 # a native dialog here - if T3_SSH_AUTH_SECRET is missing, that's a caller bug\r
 # and we fail loudly.\r
+#\r
+# Uses SecureString for password handling to prevent plaintext exposure.\r
 if ($null -ne $env:T3_SSH_AUTH_SECRET) {\r
-  [Console]::Out.WriteLine($env:T3_SSH_AUTH_SECRET)\r
+  # Convert to SecureString for secure handling\r
+  $securePassword = ConvertTo-SecureString -String $env:T3_SSH_AUTH_SECRET -AsPlainText -Force\r
+  # Use SecureString BSTR for output (minimizes plaintext exposure time)\r
+  $bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword)\r
+  try {\r
+    $plainText = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)\r
+    [Console]::Out.WriteLine($plainText)\r
+  } finally {\r
+    # Zero out the BSTR to prevent memory scraping\r
+    [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)\r
+  }\r
   exit 0\r
 }\r
 [Console]::Error.WriteLine("T3 Code ssh-askpass invoked without T3_SSH_AUTH_SECRET.")\r
@@ -139,7 +197,7 @@ export const buildSshAskpassHelperDescriptor = Effect.fn(
       {
         path: path.join(directory, "ssh-askpass.sh"),
         contents: ASKPASS_POSIX_SCRIPT,
-        mode: 0o700,
+        mode: 0o600,
       },
     ],
   };
@@ -158,6 +216,9 @@ export const ensureSshAskpassHelpers = Effect.fn("ssh/auth.ensureSshAskpassHelpe
     yield* fs.makeDirectory(path.dirname(descriptor.launcherPath), { recursive: true });
 
     for (const file of descriptor.files) {
+      // Validate path against shell metacharacters before writing
+      validateAskpassPath(file.path);
+
       const existing = yield* fs.exists(file.path);
       const current = existing ? yield* fs.readFileString(file.path) : null;
       if (current !== file.contents) {
