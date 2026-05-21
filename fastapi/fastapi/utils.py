@@ -92,11 +92,35 @@ def generate_operation_id_for_path(
     return operation_id
 
 
+def _sanitize_operation_id(operation_id: str) -> str:
+    """Sanitize operation ID to only contain lowercase alphanumeric and underscores."""
+    operation_id = operation_id.lower()
+    operation_id = re.sub(r"[^a-z0-9_]", "_", operation_id)
+    # Collapse multiple underscores into one
+    operation_id = re.sub(r"_+", "_", operation_id)
+    # Strip leading/trailing underscores
+    operation_id = operation_id.strip("_")
+    return operation_id
+
+
 def generate_unique_id(route: "APIRoute") -> str:
-    operation_id = f"{route.name}{route.path_format}"
-    operation_id = re.sub(r"\W", "_", operation_id)
+    # Build the base ID from method, prefix, and route name
     assert route.methods
-    operation_id = f"{operation_id}_{list(route.methods)[0].lower()}"
+    method = list(route.methods)[0].lower()
+    prefix = route.prefix or ""
+    operation_id = f"{method}_{prefix}_{route.name}"
+    operation_id = _sanitize_operation_id(operation_id)
+
+    # Collision detection: if this ID was already generated, append a numeric suffix
+    if not hasattr(generate_unique_id, "_seen_ids"):
+        generate_unique_id._seen_ids = {}
+
+    base_id = operation_id
+    counter = generate_unique_id._seen_ids.get(base_id, 0)
+    if counter > 0:
+        operation_id = f"{base_id}_{counter}"
+    generate_unique_id._seen_ids[base_id] = counter + 1
+
     return operation_id
 
 
