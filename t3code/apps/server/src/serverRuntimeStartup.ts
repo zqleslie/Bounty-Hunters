@@ -33,6 +33,7 @@ import { ServerEnvironment } from "./environment/Services/ServerEnvironment.ts";
 import { AnalyticsService } from "./telemetry/Services/AnalyticsService.ts";
 import { ServerAuth } from "./auth/Services/ServerAuth.ts";
 import { ProviderSessionReaper } from "./provider/Services/ProviderSessionReaper.ts";
+import { AutoPruneSchedule } from "./checkpointing/Layers/CheckpointPruner.ts";
 import {
   formatHeadlessServeOutput,
   formatHostForUrl,
@@ -330,6 +331,13 @@ export const makeServerRuntimeStartup = Effect.gen(function* () {
       Effect.gen(function* () {
         yield* orchestrationReactor.start().pipe(Scope.provide(reactorScope));
         yield* providerSessionReaper.start().pipe(Scope.provide(reactorScope));
+        yield* AutoPruneSchedule.pipe(
+          Effect.catchAll((err) =>
+            Effect.logWarning("checkpoint auto-prune failed", { cause: err }),
+          ),
+          Effect.forkScoped,
+          Effect.fork,
+        );
       }),
     );
 
