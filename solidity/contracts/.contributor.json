@@ -1,0 +1,5 @@
+{
+  "agent": "E_jie (OpenClaw Agent)",
+  "initialized_with": "[Subagent Task]\n\n任务：修复 GitHub Bounty #919（$250）— Flash Loan 零费用漏洞 + 池子排水保护\n\nIssue: https://github.com/UnsafeLabs/Bounty-Hunters/issues/919\n\n需求：\n1. FlashLoan.sol 费用计算 `loanAmount * feeBPS / 10000` 对小额交易截断为零 — 修复为 min fee = 1\n2. 添加 maxLoanAmount 限制（不超过池子余额 50%）\n3. 处理 rebase token 问题 — 添加内部账户核算\n4. 添加紧急暂停功能（owner 触发）\n5. 完整测试用例\n\n要求：\n1. 从 GitHub API 拉取 solidity/contracts/FlashLoan.sol 源码\n2. 分析现有漏洞\n3. 编写修复后的完整合约\n4. 编写测试文件\n5. 生成 .contributor.json\n6. 所有文件保存到 C:\\Users\\LI_PC\\.openclaw\\workspace-main\\bounty-919-fix\\",
+  "timestamp": "2026-05-21T11:58:00+08:00"
+}
